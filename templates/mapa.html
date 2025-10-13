@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mapa de Polígonos</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<style>
+  body { font-family: Arial, sans-serif; margin:0; padding:0; }
+  header { background-color: #0056b3; color: white; padding: 10px; }
+  header h2 { margin:0; font-size:20px; display:inline-block; }
+  header span { float:right; }
+  #container { display:flex; height:calc(100vh - 60px); }
+  #map { flex:2; height:100%; }
+  #tabla-container { flex:1; overflow:auto; border-left:2px solid #ccc; background:#f9f9f9; padding:10px; font-size:12px; }
+  table.dataTable thead th, table.dataTable tfoot th { background-color:#0056b3; color:white; }
+  table.dataTable tbody tr { height: 28px; }
+  td input { width:95%; border:none; background:transparent; font-size:12px; padding:2px; box-sizing:border-box; }
+  td input:hover, td input:focus { background:#eef; outline:none; }
+  button { margin-top:5px; background-color:#0056b3; color:white; border:none; padding:6px 10px; cursor:pointer; border-radius:4px; font-size:12px; }
+  button:hover { background-color:#003f80; }
+  #colorBloque { margin-left:5px; font-size:12px; }
+  #botonera { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:10px; }
+  #botonera button { flex:1; min-width:120px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h2>Mapa de Polígonos - {{ usuario }}</h2>
+  <span><a href="/logout" style="color:white;">Cerrar sesión</a></span>
+</header>
+
+<div id="container">
+  <div id="map"></div>
+
+  <div id="tabla-container">
+    <h3>Editar atributos</h3>
+
+    <div id="botonera">
+      <label>Color en bloque:</label>
+      <select id="colorBloque">
+        <option value="">-- Elegir color --</option>
+        {% for c in [
+          {"nombre":"Rojo","codigo":"#FF0000"},
+          {"nombre":"Verde","codigo":"#00FF00"},
+          {"nombre":"Azul","codigo":"#0000FF"},
+          {"nombre":"Amarillo","codigo":"#FFFF00"},
+          {"nombre":"Naranja","codigo":"#FFA500"},
+          {"nombre":"Morado","codigo":"#800080"},
+          {"nombre":"Cyan","codigo":"#00FFFF"},
+          {"nombre":"Magenta","codigo":"#FF00FF"},
+          {"nombre":"Gris","codigo":"#808080"},
+          {"nombre":"Negro","codigo":"#000000"},
+          {"nombre":"Blanco","codigo":"#FFFFFF"}
+        ] %}
+        <option value="{{ c.codigo }}">{{ c.nombre }}</option>
+        {% endfor %}
+      </select>
+
+      <button id="aplicarColor">Aplicar a seleccionados</button>
+      <button id="seleccionarFiltrados" style="background-color:#28a745;">Seleccionar filtrados</button>
+      <button id="deseleccionarTodos" style="background-color:#dc3545;">Deseleccionar todos</button>
+    </div>
+
+    <table id="tablaPoligonos" class="display" style="width:100%">
+      <thead>
+        <tr>
+          <th>Seleccionar</th>
+          <th>Nombre</th>
+          <th>Superficie</th>
+          <th>Partido</th>
+          <th>Color</th>
+        </tr>
+      </thead>
+      <tfoot>
+        <tr>
+          <th></th>
+          <th>Filtrar Nombre</th>
+          <th>Filtrar Superficie</th>
+          <th>Filtrar Partido</th>
+          <th>Filtrar Color</th>
+        </tr>
+      </tfoot>
+      <tbody>
+        {% for p in poligonos %}
+        <tr data-index="{{ loop.index0 }}">
+          <td><input type="checkbox" class="selectFila"></td>
+          <td><input type="text" value="{{ p.name }}"></td>
+          <td><input type="text" value="{{ p.superficie }}"></td>
+          <td><input type="text" value="{{ p.partido }}"></td>
+          <td><input type="color" value="{{ p.color }}" class="colorInput"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <button id="guardarBtn">💾 Guardar cambios</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+<script>
+const rol = "{{ rol }}";
+const poligonos = {{ poligonos|tojson }};
+const map = L.map('map').setView([-35, -63], 8);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+
+const leafletPoligonos = [];
+if(rol==="admin"){
+  poligonos.forEach((p)=>{
+    if(p.coords && p.coords.length>0){
+      const poly = L.polygon(p.coords,{ color:"black", weight:0.5, fillColor:p.color, fillOpacity:0.6 })
+        .addTo(map)
+        .bindPopup("<b>"+p.name+"</b><br>Superficie: "+p.superficie);
+      leafletPoligonos.push(poly);
+    } else { leafletPoligonos.push(null); }
+  });
+}
+
+// === DataTable con filtros ===
+$('#tablaPoligonos tfoot th').each(function(){
+  if($(this).text().includes('Filtrar')){
+    $(this).html('<input type="text" placeholder="'+$(this).text()+'" style="width:90%; font-size:11px;" />');
+  }
+});
+
+const table = $('#tablaPoligonos').DataTable({
+  paging:false,
+  info:false,
+  searching:true,
+  order:[],
+  scrollY:"calc(100vh - 140px)",
+  scrollX:true,
+  scrollCollapse:true,
+  columnDefs:[{
+    targets:"_all",
+    render:function(data,type,row,meta){
+      const input=$('<div>').html(data).find('input');
+      if(input.length){
+        const val=input.val();
+        if(type==='sort'||type==='filter') return val||"";
+      }
+      return data;
+    }
+  }]
+});
+
+// === Filtro por columna ===
+table.columns().every(function(){
+  const that = this;
+  $('input', this.footer()).on('keyup change', function(){
+    that.search(this.value).draw();
+  });
+});
+
+// === Guardar cambios ===
+$('#guardarBtn').click(function(){
+  const filas = document.querySelectorAll("#tablaPoligonos tbody tr");
+  const nuevosDatos = [];
+  filas.forEach((fila)=>{
+    const celdas = fila.querySelectorAll("input:not(.selectFila)");
+    nuevosDatos.push({
+      name:celdas[0].value,
+      superficie:celdas[1].value,
+      partido:celdas[2].value,
+      color:celdas[3].value
+    });
+  });
+  fetch("/guardar",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(nuevosDatos)
+  }).then(r=>r.json())
+  .then(d=>alert(d.success?"✅ Guardado correctamente":"⚠️ Error al guardar"))
+  .catch(()=>alert("❌ Error al conectar con el servidor"));
+});
+
+// === Cambiar color instantáneo en el mapa ===
+$('#tablaPoligonos').on('input','.colorInput',function(){
+  const fila=$(this).closest('tr');
+  const idx = parseInt(fila.attr('data-index'));
+  const nuevoColor=$(this).val();
+  if(rol==='admin' && leafletPoligonos[idx]){
+    leafletPoligonos[idx].setStyle({ fillColor: nuevoColor });
+  }
+});
+
+// === Aplicar color en bloque ===
+$('#aplicarColor').click(function(){
+  const color=$('#colorBloque').val();
+  if(!color) return alert("Seleccioná un color");
+  $('#tablaPoligonos tbody tr').each(function(){
+    const fila=$(this);
+    if(fila.find('.selectFila').is(':checked')){
+      fila.find('.colorInput').val(color).trigger('input'); // dispara cambio en mapa
+    }
+  });
+});
+
+// === Seleccionar todos los registros filtrados ===
+$('#seleccionarFiltrados').click(function(){
+  const filasVisibles = table.rows({ filter: 'applied' }).nodes();
+  $(filasVisibles).each(function(){
+    $(this).find('.selectFila').prop('checked', true);
+  });
+  alert("✅ Se seleccionaron todos los registros filtrados (" + filasVisibles.length + ")");
+});
+
+// === Deseleccionar todos ===
+$('#deseleccionarTodos').click(function(){
+  $('#tablaPoligonos .selectFila').prop('checked', false);
+  alert("❌ Se deseleccionaron todos los registros");
+});
+</script>
+
+</body>
+</html>
+
