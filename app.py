@@ -15,14 +15,14 @@ USERS = {
     "usuario5": {"password": "contraseña5", "rol": "usuario"}
 }
 
-# === ARCHIVO EXCEL BASE ===
-ARCHIVO_EXCEL = r"C:\Users\Diego\mi_app\data\BUENOS AIRES  NOROESTE.xlsx"
+# === ARCHIVO EXCEL BASE (ruta relativa) ===
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ARCHIVO_EXCEL = os.path.join(BASE_DIR, "data", "BUENOS AIRES  NOROESTE.xlsx")
 
 def cargar_poligonos():
     """Carga los polígonos desde el Excel."""
     df = pd.read_excel(ARCHIVO_EXCEL)
 
-    # Asegura que existan las columnas esperadas
     columnas = ["NOMBRE", "SUPERFICIE", "PARTIDO", "COLOR HEX", "COORDENADAS"]
     for col in columnas:
         if col not in df.columns:
@@ -61,12 +61,11 @@ def guardar_poligonos(nuevos_datos):
     df.to_excel(ARCHIVO_EXCEL, index=False)
 
 
-# === RUTA DE LOGIN ===
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         username = request.form.get("username")
-        password = request.form.get("password")  # evita KeyError
+        password = request.form.get("password")
 
         if username in USERS and USERS[username]["password"] == password:
             session["usuario"] = username
@@ -78,7 +77,6 @@ def login():
     return render_template("login.html")
 
 
-# === RUTA PRINCIPAL ===
 @app.route("/")
 def index():
     if "usuario" not in session:
@@ -88,7 +86,6 @@ def index():
     rol = session["rol"]
     poligonos = cargar_poligonos()
 
-    # Para usuarios no admin, ocultar coordenadas
     if rol != "admin":
         for p in poligonos:
             p["coords"] = []
@@ -96,7 +93,6 @@ def index():
     return render_template("mapa.html", usuario=usuario, rol=rol, poligonos=poligonos)
 
 
-# === GUARDAR CAMBIOS (POST) ===
 @app.route("/guardar", methods=["POST"])
 def guardar():
     if "usuario" not in session:
@@ -108,10 +104,9 @@ def guardar():
         return jsonify({"success": True})
     except Exception as e:
         print("Error al guardar:", e)
-        return jsonify({"success": False})
+        return jsonify({"success": False, "message": str(e)})
 
 
-# === LOGOUT ===
 @app.route("/logout")
 def logout():
     session.clear()
