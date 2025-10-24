@@ -189,11 +189,24 @@ poligonos.forEach((p)=> {
       fillOpacity:0.6
     }).addTo(map)
     .bindPopup("<b>"+p.name+"</b><br>Superficie: "+p.superficie);
+    
     poly.options._originalStyle = { color: poly.options.color, weight: poly.options.weight, fillColor: poly.options.fillColor, fillOpacity: poly.options.fillOpacity, opacity: poly.options.opacity || 1 };
     poly.options._currentFillColor = p.color;
+
+    // ---- HOVER ----
+    poly.on('mouseover', function(e){
+        this.setStyle({ fillColor: "#7CFF7C", fillOpacity: 0.8 });
+        this.bindTooltip(p.name, { permanent:false, direction:"top" }).openTooltip();
+    });
+    poly.on('mouseout', function(e){
+        this.setStyle({ fillColor: p.color, fillOpacity: 0.6 });
+        this.closeTooltip();
+    });
+
     leafletPoligonos.push(poly);
   } else { leafletPoligonos.push(null); }
 });
+
 
 // ==== DataTable ====
 const table = $('#tablaPoligonos').DataTable({
