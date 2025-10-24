@@ -8,10 +8,10 @@ app.secret_key = "BanfiClaveSegura123"
 # === CONFIGURACIÓN DE USUARIOS ===
 USERS = {
     "DSUBICI": {"password": "Banfi138", "rol": "admin"},
-    "TODOS": {"password": "todos1", "rol": "usuario"},
-    "PINTO": {"password": "pinto1", "rol": "usuario"},
-    "AMEGHINO": {"password": "ameghino1", "rol": "usuario"},
-    "VILLEGAS": {"password": "villegas1", "rol": "usuario"},
+    "usuario1": {"password": "contraseña1", "rol": "usuario"},
+    "usuario2": {"password": "contraseña2", "rol": "usuario"},
+    "usuario3": {"password": "contraseña3", "rol": "usuario"},
+    "usuario4": {"password": "contraseña4", "rol": "usuario"},
     "usuario5": {"password": "contraseña5", "rol": "usuario"}
 }
 
@@ -136,7 +136,7 @@ def nuevo_archivo():
     df.to_excel(ruta, index=False)
     return jsonify({"success": True, "archivo": nombre})
 
-# === GUARDAR CAMBIOS (Sobrescribir) ===
+# === GUARDAR CAMBIOS ===
 @app.route("/guardar", methods=["POST"])
 def guardar():
     if "usuario" not in session:
@@ -151,50 +151,6 @@ def guardar():
     try:
         guardar_poligonos(ruta_archivo, datos)
         return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)})
-
-# === GUARDAR COMO (Archivo nuevo) ===
-@app.route("/guardar_como", methods=["POST"])
-def guardar_como():
-    if "usuario" not in session:
-        return jsonify({"success": False, "message": "No autenticado"})
-
-    usuario = session["usuario"]
-    datos = request.get_json()
-    nuevo_nombre = datos.get("nuevo_nombre")
-    registros = datos.get("datos", [])
-
-    if not nuevo_nombre:
-        return jsonify({"success": False, "message": "Debe indicar un nombre para el nuevo archivo."})
-
-    if not nuevo_nombre.endswith(".xlsx"):
-        nuevo_nombre += ".xlsx"
-
-    ruta_actual = obtener_ruta_archivo(usuario, session.get("archivo_seleccionado"))
-    ruta_nueva = obtener_ruta_archivo(usuario, nuevo_nombre)
-
-    if os.path.exists(ruta_nueva):
-        return jsonify({"success": False, "message": "El archivo ya existe."})
-
-    try:
-        # Cargar archivo original
-        df = pd.read_excel(ruta_actual)
-
-        # Aplicar cambios
-        for item in registros:
-            idx = item.get("index")
-            if idx is not None and 0 <= idx < len(df):
-                df.at[idx, "NOMBRE"] = item["name"]
-                df.at[idx, "SUPERFICIE"] = item["superficie"]
-                df.at[idx, "STATUS"] = item["status"]
-                df.at[idx, "PARTIDO"] = item["partido"]
-                df.at[idx, "COLOR HEX"] = item["color"]
-
-        # Guardar como nuevo archivo
-        df.to_excel(ruta_nueva, index=False)
-
-        return jsonify({"success": True, "archivo": nuevo_nombre})
     except Exception as e:
         return jsonify({"success": False, "message": str(e)})
 
